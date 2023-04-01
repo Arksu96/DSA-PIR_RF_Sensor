@@ -57,14 +57,16 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define PIR_H_Pin GPIO_PIN_0
-#define PIR_H_GPIO_Port GPIOA
-#define PIR_L_Pin GPIO_PIN_2
-#define PIR_L_GPIO_Port GPIOA
-#define RF_Payload_Pin GPIO_PIN_8
-#define RF_Payload_GPIO_Port GPIOA
-#define RF_Reset_Pin GPIO_PIN_9
+#define Radar_OUT_Pin GPIO_PIN_1
+#define Radar_OUT_GPIO_Port GPIOA
+#define RF_Reset_Pin GPIO_PIN_8
 #define RF_Reset_GPIO_Port GPIOA
+#define RF_Payload_Pin GPIO_PIN_9
+#define RF_Payload_GPIO_Port GPIOA
+#define PIR_H_Pin GPIO_PIN_11
+#define PIR_H_GPIO_Port GPIOA
+#define PIR_L_Pin GPIO_PIN_12
+#define PIR_L_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
