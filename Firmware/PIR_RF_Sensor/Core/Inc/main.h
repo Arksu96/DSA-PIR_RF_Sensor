@@ -59,14 +59,19 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define Radar_OUT_Pin GPIO_PIN_1
 #define Radar_OUT_GPIO_Port GPIOA
+#define SPI1_NSS_Pin GPIO_PIN_4
+#define SPI1_NSS_GPIO_Port GPIOA
 #define RF_Reset_Pin GPIO_PIN_8
 #define RF_Reset_GPIO_Port GPIOA
 #define RF_Payload_Pin GPIO_PIN_9
 #define RF_Payload_GPIO_Port GPIOA
+#define RF_Payload_EXTI_IRQn EXTI4_15_IRQn
 #define PIR_H_Pin GPIO_PIN_11
 #define PIR_H_GPIO_Port GPIOA
+#define PIR_H_EXTI_IRQn EXTI4_15_IRQn
 #define PIR_L_Pin GPIO_PIN_12
 #define PIR_L_GPIO_Port GPIOA
+#define PIR_L_EXTI_IRQn EXTI4_15_IRQn
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

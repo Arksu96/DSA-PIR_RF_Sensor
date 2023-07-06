@@ -26,7 +26,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "RFM69.h"
+#include "PIR.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,7 +47,12 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+uint8_t deviceType = 0;
+uint8_t RFMinit = 0;
+uint8_t RFMMessageOK = 0;
 
+PIR_Event PIR[MAX_NUM_OF_EVENTS];
+PIR_Occurance PIR_instance;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -97,13 +103,33 @@ int main(void)
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
-
+  SPIInit(&hspi1);
+  if(RFM69_initialize(RF69_868MHZ, 2, 1)){
+	  RFMinit = 1;
+	  RFM69_initMsg();
+  }
+  deviceType = RFM69_readReg(0x10);
+  PIR_init();
+  //RFM69_setAddress(2);
+  //RFM69_setHighPower(1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  //retry RFM init if failed
+//	  if(!RFMinit){
+//		  RFM69_initialize(RF69_868MHZ, 2, 1);
+//	  }
+
+	  //Check if timeout on PIR
+	  if(PIR_SensivityTimeout(&PIR_instance) || PIR_counterLimit(&PIR_instance)){
+		  //Send info to ESP
+		  if(PIR_sendRF(&PIR_instance, PIR)){
+			  PIR_reset(&PIR_instance);
+		  }
+	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -183,7 +209,29 @@ static void MX_NVIC_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin == RF_Payload_Pin && checkInterruptStatus())
+	{
+		RFM69_ISRRx();
+	}
+	if(GPIO_Pin == PIR_H_Pin)
+	{
+		if(HAL_GPIO_ReadPin(PIR_H_GPIO_Port, PIR_H_Pin) == GPIO_PIN_SET){
+			PIR_DetectionCallback(PIR_H_Pin, PIR_RISING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
+		} else {
+			PIR_DetectionCallback(PIR_H_Pin, PIR_FALLING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
+		}
+	}
+	if(GPIO_Pin == PIR_L_Pin)
+	{
+		if(HAL_GPIO_ReadPin(PIR_L_GPIO_Port, PIR_L_Pin) == GPIO_PIN_SET){
+			PIR_DetectionCallback(PIR_L_Pin, PIR_RISING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
+		} else {
+			PIR_DetectionCallback(PIR_L_Pin, PIR_FALLING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
+		}
+	}
+}
 /* USER CODE END 4 */
 
 /**
