@@ -110,24 +110,19 @@ int main(void)
   }
   deviceType = RFM69_readReg(0x10);
   PIR_init();
-  //RFM69_setAddress(2);
-  //RFM69_setHighPower(1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  //retry RFM init if failed
-//	  if(!RFMinit){
-//		  RFM69_initialize(RF69_868MHZ, 2, 1);
-//	  }
-
 	  //Check if timeout on PIR
 	  if(PIR_SensivityTimeout(&PIR_instance) || PIR_counterLimit(&PIR_instance)){
 		  //Send info to ESP
 		  if(PIR_sendRF(&PIR_instance, PIR)){
 			  PIR_reset(&PIR_instance);
+		  } else {
+			  RFM69_send(RF_MASTER_ID, "Sent failed", sizeof(char)*11, false);
 		  }
 	  }
     /* USER CODE END WHILE */
