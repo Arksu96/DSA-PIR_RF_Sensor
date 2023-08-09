@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "dma.h"
 #include "i2c.h"
 #include "spi.h"
 #include "tim.h"
@@ -28,6 +29,8 @@
 /* USER CODE BEGIN Includes */
 #include "RFM69.h"
 #include "PIR.h"
+#include "LD2410.h"
+#include "ringbuffer.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -37,6 +40,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define UARTLENGTH 64
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,12 +51,19 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+//RFM69
 uint8_t deviceType = 0;
 uint8_t RFMinit = 0;
 uint8_t RFMMessageOK = 0;
-
+//PIR
 PIR_Event PIR[MAX_NUM_OF_EVENTS];
 PIR_Occurance PIR_instance;
+//UART
+uint8_t ReceiveBuffer[UARTLENGTH];
+ring_buffer_t ring_buffer;
+char buf_arr[UARTLENGTH];
+char tmp;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,6 +106,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_I2C1_Init();
   MX_SPI1_Init();
   MX_TIM2_Init();
@@ -103,20 +115,25 @@ int main(void)
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
+  //RFM69
   SPIInit(&hspi1);
   if(RFM69_initialize(RF69_868MHZ, 2, 1)){
 	  RFMinit = 1;
 	  RFM69_initMsg();
   }
   deviceType = RFM69_readReg(0x10);
-  PIR_init();
+  //PIR
+  //PIR_init();
+  //UART
+  ring_buffer_init(&ring_buffer, buf_arr, sizeof(buf_arr));
+  HAL_UART_Receive_DMA(&huart2, ReceiveBuffer, UARTLENGTH);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  //Check if timeout on PIR
+	  /*//Check if timeout on PIR
 	  if(PIR_SensivityTimeout(&PIR_instance) || PIR_counterLimit(&PIR_instance)){
 		  //Send info to ESP
 		  if(PIR_sendRF(&PIR_instance, PIR)){
@@ -124,7 +141,12 @@ int main(void)
 		  } else {
 			  RFM69_send(RF_MASTER_ID, "Sent failed", sizeof(char)*11, false);
 		  }
-	  }
+	  }*/
+	  //getFirmwareVersion();
+//	  if(ring_buffer_is_full(&ring_buffer)){
+//		  while(ring_buffer_dequeue(&ring_buffer, &tmp) > 0);
+//	  }
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -189,18 +211,15 @@ void SystemClock_Config(void)
   */
 static void MX_NVIC_Init(void)
 {
-  /* SPI1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(SPI1_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(SPI1_IRQn);
-  /* I2C1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(I2C1_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(I2C1_IRQn);
   /* TIM2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(TIM2_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(TIM2_IRQn);
-  /* USART2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(USART2_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(USART2_IRQn);
+  /* I2C1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(I2C1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(I2C1_IRQn);
+  /* SPI1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(SPI1_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(SPI1_IRQn);
 }
 
 /* USER CODE BEGIN 4 */
@@ -227,6 +246,36 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		}
 	}
 }
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+	// Check if UART2 triggered the Callback
+	if(huart->Instance == USART2)
+	{
+		HAL_UART_Receive_DMA(&huart2, ReceiveBuffer, UARTLENGTH);
+	}
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	// Check if UART2 trigger the Callback
+	if(huart->Instance == USART2)
+	{
+		ring_buffer_queue_arr(&ring_buffer, (char*)ReceiveBuffer, UARTLENGTH);
+		readline((unsigned char *)buf_arr);
+	}
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+	// Check if UART2 trigger the Callback
+	if(huart->Instance == USART2)
+	{
+		//HAL_UARTEx_ReceiveToIdle_DMA(&huart2, ReceiveBuffer, 10);
+	}
+}
+
+
 /* USER CODE END 4 */
 
 /**
