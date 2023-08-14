@@ -63,6 +63,8 @@ uint8_t ReceiveBuffer[UARTLENGTH];
 ring_buffer_t ring_buffer;
 char buf_arr[UARTLENGTH];
 char tmp;
+//LD2410
+struct LD2410_Detection detection;
 
 /* USER CODE END PV */
 
@@ -127,12 +129,14 @@ int main(void)
   //UART
   ring_buffer_init(&ring_buffer, buf_arr, sizeof(buf_arr));
   HAL_UART_Receive_DMA(&huart2, ReceiveBuffer, UARTLENGTH);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  setConfigMode(1);
 	  /*//Check if timeout on PIR
 	  if(PIR_SensivityTimeout(&PIR_instance) || PIR_counterLimit(&PIR_instance)){
 		  //Send info to ESP
@@ -262,7 +266,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	if(huart->Instance == USART2)
 	{
 		ring_buffer_queue_arr(&ring_buffer, (char*)ReceiveBuffer, UARTLENGTH);
-		readline((unsigned char *)buf_arr);
+		readline((unsigned char *)buf_arr, &detection);
 	}
 }
 
