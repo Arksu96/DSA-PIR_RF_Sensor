@@ -59,6 +59,9 @@ uint32_t tickStart = 0;
 //SPI
 SPI_HandleTypeDef *RFM_hspi;
 
+//Stats
+struct RFM69Stats_t *_stats;
+
 void SPIInit(SPI_HandleTypeDef *spi)
 {
 	RFM_hspi = spi;
@@ -71,7 +74,7 @@ void RFM69_reset()
 	HAL_Delay(100);
 }
 
-bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID)
+bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID, struct RFM69Stats_t* RFStats)
 {
   const uint8_t CONFIG[][2] =
   {
@@ -149,6 +152,7 @@ bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID)
     return false;
   }
 
+  _stats = RFStats;
   _address = nodeID;
   return true;
 }
@@ -349,6 +353,7 @@ static void RFM69_sendFrame(uint8_t toAddress, const void* buffer, uint8_t buffe
   while (RFM69_ReadDIO0Pin() == 0 && !Timeout_IsTimeout1()); // wait for DIO0 to turn HIGH signalling transmission finish
   //while (RFM69_readReg(REG_IRQFLAGS2) & RF_IRQFLAGS2_PACKETSENT == 0x00); // wait for ModeReady
   RFM69_setMode(RF69_MODE_STANDBY);
+  (_stats->msgSend)++;
 }
 
 // internal function - interrupt gets called when a packet is received
@@ -389,8 +394,10 @@ void RFM69_interruptHandler() {
     if (datalen < RF69_MAX_DATA_LEN) data[datalen] = 0; // add null at end of string
     RFM69_unselect();
     RFM69_setMode(RF69_MODE_RX);
+    (_stats->msgReceived)++;
   }
   rssi = RFM69_readRSSI(false);
+  (_stats->lastRSSI) = rssi;
   //Parser
 }
 
@@ -597,7 +604,7 @@ void RFM69_initMsg(void)
 {
 	//RFM69 init correctly
 	RFM69_sendWithRetry(RF_MASTER_ID, "RFi=1",
-									sizeof(char)*5,
-									RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
+						sizeof(char)*5,
+						RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
 }
 

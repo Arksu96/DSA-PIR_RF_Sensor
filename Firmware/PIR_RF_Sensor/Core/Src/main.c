@@ -50,6 +50,7 @@
 uint8_t deviceType = 0;
 uint8_t RFMinit = 0;
 uint8_t RFMMessageOK = 0;
+struct RFM69Stats_t RFStats;
 
 PIR_Event PIR[MAX_NUM_OF_EVENTS];
 PIR_Occurance PIR_instance;
@@ -104,7 +105,7 @@ int main(void)
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
   SPIInit(&hspi1);
-  if(RFM69_initialize(RF69_868MHZ, 2, 1)){
+  if(RFM69_initialize(RF69_868MHZ, 2, 1, &RFStats)){
 	  RFMinit = 1;
 	  RFM69_initMsg();
   }

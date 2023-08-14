@@ -8,6 +8,7 @@
 #include "PIR.h"
 #include "RFM69.h"
 #include "stdlib.h"
+#include "stdio.h"
 
 //PIR Timer
 uint32_t PIR_timeout;
@@ -148,33 +149,42 @@ uint8_t PIR_sendRF(PIR_Occurance* PIR_status, PIR_Event PIR[])
 	RF_OK = RFM69_sendWithRetry(RF_MASTER_ID, packet,
 								sizeof(char)*strlen(packet),
 								RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
+	free((char*)packet);
+
 	return RF_OK;
 }
 
 const char* PIR_preparePacket(PIR_Occurance* PIR_status)
 {
+	char* packetFormat = "TD=%d,NE=%d,MD=%d";
+
 	char packet[RF69_MAX_DATA_LEN];
 	memset(packet, '\0', sizeof(char)*RF69_MAX_DATA_LEN);
-	char buf[10];
-	buf[0] = '\0';
 
-	//Trigger detection
-	strcat(packet, "TD=");
-	utoa(PIR_status->PIR_triggerDirection, buf, 10);
-	strcat(packet, buf);
-	strcat(packet, ",");
-	memset(buf, '\0', sizeof(char)*10);
-	//Number of events
-	strcat(packet, "NE=");
-	utoa(PIR_status->PIR_numOfEvents, buf, 10);
-	strcat(packet, buf);
-	strcat(packet, ",");
-	memset(buf, '\0', sizeof(char)*10);
-	//Mean duration
-	strcat(packet, "MD=");
-	utoa(PIR_status->PIR_meanDuration, buf, 10);
-	strcat(packet, buf);
+	sprintf(packet, packetFormat, PIR_status->PIR_triggerDirection,
+								  PIR_status->PIR_numOfEvents,
+								  PIR_status->PIR_meanDuration);
 
+//	char buf[10];
+//	buf[0] = '\0';
+//
+//	//Trigger detection
+//	strcat(packet, "TD=");
+//	utoa(PIR_status->PIR_triggerDirection, buf, 10);
+//	strcat(packet, buf);
+//	strcat(packet, ",");
+//	memset(buf, '\0', sizeof(char)*10);
+//	//Number of events
+//	strcat(packet, "NE=");
+//	utoa(PIR_status->PIR_numOfEvents, buf, 10);
+//	strcat(packet, buf);
+//	strcat(packet, ",");
+//	memset(buf, '\0', sizeof(char)*10);
+//	//Mean duration
+//	strcat(packet, "MD=");
+//	utoa(PIR_status->PIR_meanDuration, buf, 10);
+//	strcat(packet, buf);
+//
 	char *stringBuf = malloc(RF69_MAX_DATA_LEN);
 	strcpy(stringBuf, packet);
 
