@@ -33,7 +33,7 @@ void PIR_DetectionCallback(uint16_t PIR_Pin, uint8_t PIR_PinIRQ, PIR_Event* PIR,
 		PIR_startPhase(PIR, PIR_Pin, time);
 	} else if(PIR_PinIRQ == PIR_RISING && PIR_Pin == PIR->PIR_RisingPin){
 		//debounce (circa 2 ms unstable signal)
-		if(PIR_IRQduration(PIR->PIR_start, time) <= 5){
+		if(PIR_IRQduration(PIR->PIR_start, time) >= 5){
 			PIR_endPhase(PIR, PIR_status, time);
 		}
 	}
