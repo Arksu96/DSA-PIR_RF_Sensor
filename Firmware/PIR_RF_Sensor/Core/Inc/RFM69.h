@@ -83,11 +83,11 @@
 #include "spi.h"
 
 //RFM69 statistic
-struct RFM69Stats_t{
+typedef struct RFM69Stats_t{
 	uint16_t msgSend;
 	uint16_t msgReceived;
 	int16_t lastRSSI;
-};
+}RFM69Stats_t;
 
 // used function prototypes
 void RFM69_writeReg(uint8_t addr, uint8_t val);
@@ -119,7 +119,7 @@ void RFM69_encrypt(const char* key);
 int16_t RFM69_readRSSI(bool forceTrigger);
 void RFM69_select(void);
 void RFM69_setMode(uint8_t newMode);
-bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID,struct RFM69Stats_t* RFStats);
+bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID, RFM69Stats_t* RFStats);
 void SPIInit(SPI_HandleTypeDef *spi);
 void RFM69_ISRRx(void);
 

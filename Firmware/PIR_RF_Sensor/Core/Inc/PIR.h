@@ -36,19 +36,15 @@ typedef struct PIR_Occurance
 //PIR init
 void PIR_init();
 //PIR detection
-void PIR_DetectionCallback(uint16_t PIR_Pin, uint8_t PIR_PinIRQ, PIR_Event *PIR, PIR_Occurance* PIR_status);
+void PIR_DetectionCallback(uint16_t PIR_Pin, uint8_t PIR_PinIRQ, PIR_Event *PIR, PIR_Occurance* PIR_status, uint32_t time);
 //Determine start of cycle
 uint8_t PIR_isFirst(PIR_Event *PIR);
 //Start of first phase
-void PIR_startPhase(PIR_Event *PIR, uint16_t PIR_Pin);
-//Start of second phase
-//void PIR_startSecondPhase(PIR_Event *PIR);
-//End of first phase
-//void PIR_endFirstPhase(PIR_Event *PIR);
-//End of second phase
-void PIR_endPhase(PIR_Event *PIR, PIR_Occurance* PIR_status);
+void PIR_startPhase(PIR_Event *PIR, uint16_t PIR_Pin, uint32_t time);
+//End phase
+void PIR_endPhase(PIR_Event *PIR, PIR_Occurance* PIR_status, uint32_t time);
 //Rise to Fall timer
-uint32_t PIR_IRQduration(uint32_t StartTime);
+uint32_t PIR_IRQduration(uint32_t StartTime, uint32_t EndTime);
 //Timer Callback
 uint8_t PIR_SensivityTimeout(PIR_Occurance* PIR_status);
 //Set timer

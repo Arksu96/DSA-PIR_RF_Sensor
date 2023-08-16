@@ -20,24 +20,21 @@ uint16_t PIR_counterMax;
 
 void PIR_init()
 {
-	//Reset Rising Pin value
-	//PIR->PIR_RisingPin = 0;
 	//Set sensivity timer
 	PIR_SetSensivityTimer(2);
 	//wait 8s for PIR settling
-	HAL_Delay(8000);
+	HAL_Delay(10000);
 }
 
-void PIR_DetectionCallback(uint16_t PIR_Pin, uint8_t PIR_PinIRQ, PIR_Event* PIR, PIR_Occurance* PIR_status)
+void PIR_DetectionCallback(uint16_t PIR_Pin, uint8_t PIR_PinIRQ, PIR_Event* PIR, PIR_Occurance* PIR_status, uint32_t time)
 {
 	//Check Rise or Fall
-	if(PIR_PinIRQ == PIR_FALLING){
-		PIR_startPhase(PIR, PIR_Pin);
-	} else {
-		if(PIR_isFirst(PIR)){
-			PIR->PIR_RisingPin = 0;
-		} else {
-			PIR_endPhase(PIR, PIR_status);
+	if(PIR_PinIRQ == PIR_FALLING && PIR_isFirst(PIR)){
+		PIR_startPhase(PIR, PIR_Pin, time);
+	} else if(PIR_PinIRQ == PIR_RISING && PIR_Pin == PIR->PIR_RisingPin){
+		//debounce (circa 2 ms unstable signal)
+		if(PIR_IRQduration(PIR->PIR_start, time) <= 5){
+			PIR_endPhase(PIR, PIR_status, time);
 		}
 	}
 }
@@ -50,27 +47,17 @@ uint8_t PIR_isFirst(PIR_Event* PIR)
 	return 0;
 }
 
-void PIR_startPhase(PIR_Event *PIR, uint16_t PIR_Pin)
+void PIR_startPhase(PIR_Event *PIR, uint16_t PIR_Pin, uint32_t time)
 {
 	PIR->PIR_RisingPin = PIR_Pin;
-	PIR->PIR_start = HAL_GetTick();
+	PIR->PIR_start = time;
 	//Start sensivity timer countdown
-	PIR_timeoutStart = HAL_GetTick();
+	PIR_timeoutStart = time;
 }
 
-//void PIR_startSecondPhase(PIR_Event *PIR)
-//{
-//	PIR->PIR_secondStart = HAL_GetTick();
-//}
-//
-//void PIR_endFirstPhase(PIR_Event *PIR)
-//{
-//	PIR->PIR_firstDuration = PIR_IRQduration(PIR->PIR_firstStart);
-//}
-
-void PIR_endPhase(PIR_Event *PIR, PIR_Occurance* PIR_status)
+void PIR_endPhase(PIR_Event *PIR, PIR_Occurance* PIR_status, uint32_t time)
 {
-	PIR->PIR_duration = PIR_IRQduration(PIR->PIR_start);
+	PIR->PIR_duration = PIR_IRQduration(PIR->PIR_start, time);
 	//determine trigger direction
 	if(!PIR_status->PIR_numOfEvents){
 		if(PIR->PIR_RisingPin == PIR_H_Pin){
@@ -82,10 +69,9 @@ void PIR_endPhase(PIR_Event *PIR, PIR_Occurance* PIR_status)
 	PIR_status->PIR_numOfEvents++;
 }
 
-uint32_t PIR_IRQduration(uint32_t StartTime)
+uint32_t PIR_IRQduration(uint32_t StartTime, uint32_t EndTime)
 {
-	uint32_t now = HAL_GetTick();
-	return now - StartTime;
+	return EndTime - StartTime;
 }
 
 void PIR_SetSensivityTimer(uint8_t SensivityLevel)
@@ -165,26 +151,6 @@ const char* PIR_preparePacket(PIR_Occurance* PIR_status)
 								  PIR_status->PIR_numOfEvents,
 								  PIR_status->PIR_meanDuration);
 
-//	char buf[10];
-//	buf[0] = '\0';
-//
-//	//Trigger detection
-//	strcat(packet, "TD=");
-//	utoa(PIR_status->PIR_triggerDirection, buf, 10);
-//	strcat(packet, buf);
-//	strcat(packet, ",");
-//	memset(buf, '\0', sizeof(char)*10);
-//	//Number of events
-//	strcat(packet, "NE=");
-//	utoa(PIR_status->PIR_numOfEvents, buf, 10);
-//	strcat(packet, buf);
-//	strcat(packet, ",");
-//	memset(buf, '\0', sizeof(char)*10);
-//	//Mean duration
-//	strcat(packet, "MD=");
-//	utoa(PIR_status->PIR_meanDuration, buf, 10);
-//	strcat(packet, buf);
-//
 	char *stringBuf = malloc(RF69_MAX_DATA_LEN);
 	strcpy(stringBuf, packet);
 

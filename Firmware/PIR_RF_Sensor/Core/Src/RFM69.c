@@ -74,7 +74,7 @@ void RFM69_reset()
 	HAL_Delay(100);
 }
 
-bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID, struct RFM69Stats_t* RFStats)
+bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID, RFM69Stats_t* RFStats)
 {
   const uint8_t CONFIG[][2] =
   {

@@ -47,11 +47,13 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+//RFM69
 uint8_t deviceType = 0;
 uint8_t RFMinit = 0;
 uint8_t RFMMessageOK = 0;
-struct RFM69Stats_t RFStats;
+RFM69Stats_t RFStats;
 
+//PIR
 PIR_Event PIR[MAX_NUM_OF_EVENTS];
 PIR_Occurance PIR_instance;
 /* USER CODE END PV */
@@ -122,6 +124,9 @@ int main(void)
 		  //Send info to ESP
 		  if(PIR_sendRF(&PIR_instance, PIR)){
 			  PIR_reset(&PIR_instance);
+			  for(int i=0; i<20; i++){
+				  memset(&PIR[i], 0, sizeof(PIR_Event));
+			  }
 		  } else {
 			  RFM69_send(RF_MASTER_ID, "Sent failed", sizeof(char)*11, false);
 		  }
@@ -211,22 +216,30 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	{
 		RFM69_ISRRx();
 	}
-	if(GPIO_Pin == PIR_H_Pin)
+	if(GPIO_Pin == PIR_H_Pin || GPIO_Pin == PIR_L_Pin)
 	{
-		if(HAL_GPIO_ReadPin(PIR_H_GPIO_Port, PIR_H_Pin) == GPIO_PIN_SET){
-			PIR_DetectionCallback(PIR_H_Pin, PIR_RISING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
+		if(HAL_GPIO_ReadPin(GPIOA, GPIO_Pin)){
+			PIR_DetectionCallback(GPIO_Pin, PIR_RISING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance, HAL_GetTick());
 		} else {
-			PIR_DetectionCallback(PIR_H_Pin, PIR_FALLING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
+			PIR_DetectionCallback(GPIO_Pin, PIR_FALLING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance, HAL_GetTick());
 		}
 	}
-	if(GPIO_Pin == PIR_L_Pin)
-	{
-		if(HAL_GPIO_ReadPin(PIR_L_GPIO_Port, PIR_L_Pin) == GPIO_PIN_SET){
-			PIR_DetectionCallback(PIR_L_Pin, PIR_RISING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
-		} else {
-			PIR_DetectionCallback(PIR_L_Pin, PIR_FALLING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
-		}
-	}
+//	if(GPIO_Pin == PIR_H_Pin)
+//	{
+//		if(HAL_GPIO_ReadPin(PIR_H_GPIO_Port, PIR_H_Pin) == GPIO_PIN_SET){
+//			PIR_DetectionCallback(PIR_H_Pin, PIR_RISING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
+//		} else {
+//			PIR_DetectionCallback(PIR_H_Pin, PIR_FALLING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
+//		}
+//	}
+//	if(GPIO_Pin == PIR_L_Pin)
+//	{
+//		if(HAL_GPIO_ReadPin(PIR_L_GPIO_Port, PIR_L_Pin) == GPIO_PIN_SET){
+//			PIR_DetectionCallback(PIR_L_Pin, PIR_RISING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
+//		} else {
+//			PIR_DetectionCallback(PIR_L_Pin, PIR_FALLING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
+//		}
+//	}
 }
 /* USER CODE END 4 */
 
