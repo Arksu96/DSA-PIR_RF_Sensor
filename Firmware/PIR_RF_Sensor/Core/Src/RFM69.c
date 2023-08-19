@@ -80,8 +80,8 @@ bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID, RFM6
   {
     /* 0x01 */ { REG_OPMODE, RF_OPMODE_SEQUENCER_ON | RF_OPMODE_LISTEN_OFF | RF_OPMODE_STANDBY },
     /* 0x02 */ { REG_DATAMODUL, RF_DATAMODUL_DATAMODE_PACKET | RF_DATAMODUL_MODULATIONTYPE_FSK | RF_DATAMODUL_MODULATIONSHAPING_00 }, // no shaping
-    /* 0x03 */ { REG_BITRATEMSB, RF_BITRATEMSB_55555}, // default: 4.8 KBPS
-    /* 0x04 */ { REG_BITRATELSB, RF_BITRATELSB_55555},
+    /* 0x03 */ { REG_BITRATEMSB, RF_BITRATEMSB_115200}, // default: 4.8 KBPS
+    /* 0x04 */ { REG_BITRATELSB, RF_BITRATELSB_115200},
     /* 0x05 */ { REG_FDEVMSB, RF_FDEVMSB_50000}, // default: 5KHz, (FDEV + BitRate / 2 <= 500KHz)
     /* 0x06 */ { REG_FDEVLSB, RF_FDEVLSB_50000},
 
@@ -264,7 +264,11 @@ void RFM69_send(uint8_t toAddress, const void* buffer, uint8_t bufferSize, bool 
 {
   RFM69_writeReg(REG_PACKETCONFIG2, (RFM69_readReg(REG_PACKETCONFIG2) & 0xFB) | RF_PACKET2_RXRESTART); // avoid RX deadlocks
   //uint32_t now = millis();
-  while (!RFM69_canSend() /*&& millis() - now < RF69_CSMA_LIMIT_MS*/) RFM69_receiveDone();
+  Timeout_SetTimeout1(RF69_CSMA_LIMIT_MS);
+  while (!RFM69_canSend() && Timeout_IsTimeout1())
+  {
+    RFM69_receiveDone();
+  }
   RFM69_sendFrame(toAddress, buffer, bufferSize, requestACK, false);
 }
 
@@ -292,8 +296,10 @@ bool RFM69_sendWithRetry(uint8_t toAddress, const void* buffer, uint8_t bufferSi
 // should be polled immediately after sending a packet with ACK request
 bool RFM69_ACKReceived(uint8_t fromNodeID) 
 {
-  if (RFM69_receiveDone())
-    return (senderID == fromNodeID || fromNodeID == RF69_BROADCAST_ADDR) && ACK_RECEIVED;
+  if (RFM69_receiveDone()){
+	  _stats->ACKReceived++;
+	  return (senderID == fromNodeID || fromNodeID == RF69_BROADCAST_ADDR) && ACK_RECEIVED;
+  }
   return false;
 }
 

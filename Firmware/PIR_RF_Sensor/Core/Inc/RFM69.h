@@ -86,6 +86,7 @@
 typedef struct RFM69Stats_t{
 	uint16_t msgSend;
 	uint16_t msgReceived;
+	uint16_t ACKReceived;
 	int16_t lastRSSI;
 }RFM69Stats_t;
 

@@ -18,12 +18,15 @@ uint16_t PIR_counterMax;
 //To determine mean time (sum/occurence)
 //uint32_t sumOfAllEventDuration;
 
+uint8_t IRQEnabled = 0;
+
 void PIR_init()
 {
 	//Set sensivity timer
 	PIR_SetSensivityTimer(2);
 	//wait 8s for PIR settling
 	HAL_Delay(10000);
+	PIR_IRQstate(1);
 }
 
 void PIR_DetectionCallback(uint16_t PIR_Pin, uint8_t PIR_PinIRQ, PIR_Event* PIR, PIR_Occurance* PIR_status, uint32_t time)
@@ -166,4 +169,14 @@ uint32_t PIR_MeanDuration(PIR_Event PIR[], uint16_t counter)
 	}
 
 	return duration/(uint32_t)counter;
+}
+
+uint8_t PIR_IRQEnabled()
+{
+	return IRQEnabled;
+}
+
+void PIR_IRQstate(uint8_t state)
+{
+	IRQEnabled = state;
 }

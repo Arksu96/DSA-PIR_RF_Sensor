@@ -60,4 +60,7 @@ void PIR_reset();
 //Check if counter exceeded max
 uint8_t PIR_counterLimit(PIR_Occurance* PIR_status);
 
+uint8_t PIR_IRQEnabled();
+void PIR_IRQstate(uint8_t state);
+
 #endif /* INC_PIR_H_ */

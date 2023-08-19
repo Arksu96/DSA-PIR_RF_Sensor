@@ -121,15 +121,16 @@ int main(void)
   {
 	  //Check if timeout on PIR
 	  if(PIR_SensivityTimeout(&PIR_instance) || PIR_counterLimit(&PIR_instance)){
+		  PIR_IRQstate(0);
 		  //Send info to ESP
-		  if(PIR_sendRF(&PIR_instance, PIR)){
-			  PIR_reset(&PIR_instance);
-			  for(int i=0; i<20; i++){
-				  memset(&PIR[i], 0, sizeof(PIR_Event));
-			  }
-		  } else {
+		  if(!PIR_sendRF(&PIR_instance, PIR)){
 			  RFM69_send(RF_MASTER_ID, "Sent failed", sizeof(char)*11, false);
 		  }
+		  PIR_reset(&PIR_instance);
+		  for(int i=0; i<20; i++){
+			  memset(&PIR[i], 0, sizeof(PIR_Event));
+		  }
+		  PIR_IRQstate(1);
 	  }
     /* USER CODE END WHILE */
 
@@ -216,7 +217,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	{
 		RFM69_ISRRx();
 	}
-	if(GPIO_Pin == PIR_H_Pin || GPIO_Pin == PIR_L_Pin)
+	if((GPIO_Pin == PIR_H_Pin || GPIO_Pin == PIR_L_Pin) && PIR_IRQEnabled())
 	{
 		if(HAL_GPIO_ReadPin(GPIOA, GPIO_Pin)){
 			PIR_DetectionCallback(GPIO_Pin, PIR_RISING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance, HAL_GetTick());
