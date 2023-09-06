@@ -600,7 +600,7 @@ void RFM69_ISRRx(void)
 	noInterrupts();
 	RFM69_interruptHandler();
 	if(RFM69_ACKRequested()){
-		RFM69_sendACK("OK", sizeof(char)*2);
+		RFM69_sendACK("", 0);
 	}
 	interrupts();
 	//Can add some error handling
