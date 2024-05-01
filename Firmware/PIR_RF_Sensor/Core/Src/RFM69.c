@@ -43,7 +43,7 @@ static volatile uint8_t _mode = RF69_MODE_STANDBY;
 static volatile int16_t rssi;                   // most accurate RSSI during reception (closest to the reception)
 
 static uint8_t _address;
-static uint8_t _powerLevel = 31;
+static uint8_t _powerLevel = 20; //prawdopodobnie zbyt wysoka wartość powodowała problemy
 bool _promiscuousMode = false;
 
 // internal
@@ -80,8 +80,8 @@ bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID, RFM6
   {
     /* 0x01 */ { REG_OPMODE, RF_OPMODE_SEQUENCER_ON | RF_OPMODE_LISTEN_OFF | RF_OPMODE_STANDBY },
     /* 0x02 */ { REG_DATAMODUL, RF_DATAMODUL_DATAMODE_PACKET | RF_DATAMODUL_MODULATIONTYPE_FSK | RF_DATAMODUL_MODULATIONSHAPING_00 }, // no shaping
-    /* 0x03 */ { REG_BITRATEMSB, RF_BITRATEMSB_115200}, // default: 4.8 KBPS
-    /* 0x04 */ { REG_BITRATELSB, RF_BITRATELSB_115200},
+    /* 0x03 */ { REG_BITRATEMSB, RF_BITRATEMSB_55555}, // default: 4.8 KBPS
+    /* 0x04 */ { REG_BITRATELSB, RF_BITRATELSB_55555},
     /* 0x05 */ { REG_FDEVMSB, RF_FDEVMSB_50000}, // default: 5KHz, (FDEV + BitRate / 2 <= 500KHz)
     /* 0x06 */ { REG_FDEVLSB, RF_FDEVLSB_50000},
 
@@ -120,7 +120,7 @@ bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID, RFM6
   
   RFM69_reset();
   RFM69_SetCSPin(HIGH);
-  /*Timeout_SetTimeout1(50);
+  Timeout_SetTimeout1(50);
   do
   {
     RFM69_writeReg(REG_SYNCVALUE1, 0xAA); 
@@ -133,7 +133,7 @@ bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID, RFM6
     RFM69_writeReg(REG_SYNCVALUE1, 0x55); 
   }
   while (RFM69_readReg(REG_SYNCVALUE1) != 0x55 && !Timeout_IsTimeout1());
-*/
+
   for (uint8_t i = 0; CONFIG[i][0] != 255; i++)
   {
     RFM69_writeReg(CONFIG[i][0], CONFIG[i][1]);
@@ -233,21 +233,45 @@ void RFM69_setNetwork(uint16_t networkID)
   RFM69_writeReg(REG_SYNCVALUE2, (uint8_t)(networkID >> 8));
 }
 
-// set *transmit/TX* output power: 0=min, 31=max
-// this results in a "weaker" transmitted signal, and directly results in a lower RSSI at the receiver
+// Control transmitter output power (this is NOT a dBm value!)
 // the power configurations are explained in the SX1231H datasheet (Table 10 on p21; RegPaLevel p66): http://www.semtech.com/images/datasheet/sx1231h.pdf
 // valid powerLevel parameter values are 0-31 and result in a directly proportional effect on the output/transmission power
 // this function implements 2 modes as follows:
-//       - for RFM69W the range is from 0-31 [-18dBm to 13dBm] (PA0 only on RFIO pin)
-//       - for RFM69HW the range is from 0-31 [5dBm to 20dBm]  (PA1 & PA2 on PA_BOOST pin & high Power PA settings - see section 3.3.7 in datasheet, p22)
+//   - for RFM69 W/CW the range is from 0-31 [-18dBm to 13dBm] (PA0 only on RFIO pin)
+//   - for RFM69 HW/HCW the range is from 0-22 [-2dBm to 20dBm]  (PA1 & PA2 on PA_BOOST pin & high Power PA settings - see section 3.3.7 in datasheet, p22)
+//   - the HW/HCW 0-24 range is split into 3 REG_PALEVEL parts:
+//     -  0-15 = REG_PALEVEL 16-31, ie [-2 to 13dBm] & PA1 only
+//     - 16-19 = REG_PALEVEL 26-29, ie [12 to 15dBm] & PA1+PA2
+//     - 20-23 = REG_PALEVEL 28-31, ie [17 to 20dBm] & PA1+PA2+HiPower (HiPower is only enabled before going in TX mode, ie by setMode(RF69_MODE_TX)
+// The HW/HCW range overlaps are to smooth out transitions between the 3 PA domains, based on actual current/RSSI measurements
+// Any changes to this function also demand changes in dependent function setPowerDBm()
 void RFM69_setPowerLevel(uint8_t powerLevel)
 {
-  _powerLevel = (powerLevel > 31 ? 31 : powerLevel);
-  if (ISRFM69HW)
-  {
-    _powerLevel /= 2;
+	uint8_t PA_SETTING;
+	if (ISRFM69HW) {
+	if (powerLevel>23) powerLevel = 23;
+	_powerLevel =  powerLevel;
+
+	//now set Pout value & active PAs based on _powerLevel range as outlined in summary above
+	if (_powerLevel < 16) {
+	  powerLevel += 16;
+	  PA_SETTING = RF_PALEVEL_PA1_ON; // enable PA1 only
+	} else {
+	  if (_powerLevel < 20)
+		powerLevel += 10;
+	  else
+		powerLevel += 8;
+	  PA_SETTING = RF_PALEVEL_PA1_ON | RF_PALEVEL_PA2_ON; // enable PA1+PA2
+	}
+	RFM69_setHighPowerRegs(true); //always call this in case we're crossing power boundaries in TX mode
+  } else { //this is a W/CW, register value is the same as _powerLevel
+	if (powerLevel>31) powerLevel = 31;
+	_powerLevel =  powerLevel;
+	PA_SETTING = RF_PALEVEL_PA0_ON; // enable PA0 only
   }
-  RFM69_writeReg(REG_PALEVEL, (RFM69_readReg(REG_PALEVEL) & 0xE0) | _powerLevel);
+
+  //write value to REG_PALEVEL
+  RFM69_writeReg(REG_PALEVEL, PA_SETTING | powerLevel);
 }
 
 bool RFM69_canSend()
@@ -263,11 +287,9 @@ bool RFM69_canSend()
 void RFM69_send(uint8_t toAddress, const void* buffer, uint8_t bufferSize, bool requestACK)
 {
   RFM69_writeReg(REG_PACKETCONFIG2, (RFM69_readReg(REG_PACKETCONFIG2) & 0xFB) | RF_PACKET2_RXRESTART); // avoid RX deadlocks
-  //uint32_t now = millis();
   Timeout_SetTimeout1(RF69_CSMA_LIMIT_MS);
-  while (!RFM69_canSend() && Timeout_IsTimeout1())
-  {
-    RFM69_receiveDone();
+  while (!RFM69_canSend() && !Timeout_IsTimeout1()){
+	  RFM69_receiveDone();
   }
   RFM69_sendFrame(toAddress, buffer, bufferSize, requestACK, false);
 }
@@ -330,8 +352,10 @@ void RFM69_sendACK(const void* buffer, uint8_t bufferSize)
 static void RFM69_sendFrame(uint8_t toAddress, const void* buffer, uint8_t bufferSize, bool requestACK, bool sendACK)
 {
   RFM69_setMode(RF69_MODE_STANDBY); // turn off receiver to prevent reception while filling fifo
-  while ((RFM69_readReg(REG_IRQFLAGS1) & RF_IRQFLAGS1_MODEREADY) == 0x00); // wait for ModeReady
-  RFM69_writeReg(REG_DIOMAPPING1, RF_DIOMAPPING1_DIO0_00); // DIO0 is "Packet Sent"
+  //uint8_t modeVal = RFM69_readReg(REG_OPMODE);
+  //uint8_t irqVal = RFM69_readReg(REG_IRQFLAGS1);// wait for ModeReady
+  while ((RFM69_readReg(REG_IRQFLAGS1) & RF_IRQFLAGS1_MODEREADY) == 0x00);
+  //RFM69_writeReg(REG_DIOMAPPING1, RF_DIOMAPPING1_DIO0_00); // DIO0 is "Packet Sent"
   if (bufferSize > RF69_MAX_DATA_LEN) bufferSize = RF69_MAX_DATA_LEN;
 
   // control byte
@@ -349,15 +373,17 @@ static void RFM69_sendFrame(uint8_t toAddress, const void* buffer, uint8_t buffe
   SPI_transfer8(_address);
   SPI_transfer8(CTLbyte);
 
-  for (uint8_t i = 0; i < bufferSize; i++)
-    SPI_transfer8(((uint8_t*) buffer)[i]);
+  for (uint8_t i = 0; i < bufferSize; i++){
+	  SPI_transfer8(((uint8_t*) buffer)[i]);
+  }
   RFM69_unselect();
 
   // no need to wait for transmit mode to be ready since its handled by the radio
   RFM69_setMode(RF69_MODE_TX);
   Timeout_SetTimeout1(RF69_TX_LIMIT_MS);
-  while (RFM69_ReadDIO0Pin() == 0 && !Timeout_IsTimeout1()); // wait for DIO0 to turn HIGH signalling transmission finish
-  //while (RFM69_readReg(REG_IRQFLAGS2) & RF_IRQFLAGS2_PACKETSENT == 0x00); // wait for ModeReady
+  //while (RFM69_ReadDIO0Pin() == 1 && !Timeout_IsTimeout1()); // wait for DIO0 to turn HIGH signalling transmission finish
+  //uint8_t irq2Val = RFM69_readReg(REG_IRQFLAGS2);
+  while ((RFM69_readReg(REG_IRQFLAGS2) & RF_IRQFLAGS2_PACKETSENT) == 0x00); // wait for ModeReady
   RFM69_setMode(RF69_MODE_STANDBY);
   (_stats->msgSend)++;
 }
@@ -497,8 +523,9 @@ void RFM69_setHighPower(bool onOff) {
 // internal function
 void RFM69_setHighPowerRegs(bool onOff) 
 {
-  RFM69_writeReg(REG_TESTPA1, onOff ? 0x5D : 0x55);
-  RFM69_writeReg(REG_TESTPA2, onOff ? 0x7C : 0x70);
+	if (!ISRFM69HW || _powerLevel<20) onOff=false;
+	RFM69_writeReg(REG_TESTPA1, onOff ? 0x5D : 0x55);
+	RFM69_writeReg(REG_TESTPA2, onOff ? 0x7C : 0x70);
 }
 
 uint8_t RFM69_readTemperature(uint8_t calFactor) // returns centigrade
@@ -610,7 +637,6 @@ void RFM69_initMsg(void)
 {
 	//RFM69 init correctly
 	RFM69_sendWithRetry(RF_MASTER_ID, "RFi=1",
-						sizeof(char)*5,
-						RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
+						sizeof(char)*5,RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
 }
 
