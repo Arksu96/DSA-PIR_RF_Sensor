@@ -31,6 +31,7 @@ typedef struct PIR_Occurance
 	uint16_t PIR_numOfEvents;
 	uint8_t PIR_triggerDirection; // 0-none, 1-left, 2-right
 	uint32_t PIR_meanDuration;
+	uint32_t PIR_movementDuration;
 } PIR_Occurance;
 
 //PIR init
@@ -46,7 +47,7 @@ void PIR_endPhase(PIR_Event *PIR, PIR_Occurance* PIR_status, uint32_t time);
 //Rise to Fall timer
 uint32_t PIR_IRQduration(uint32_t StartTime, uint32_t EndTime);
 //Timer Callback
-uint8_t PIR_SensivityTimeout(PIR_Occurance* PIR_status);
+uint8_t PIR_SensivityTimeout();
 //Set timer
 void PIR_SetSensivityTimer(uint8_t SensivityLevel);
 //Calculate mean duration of PIR Event
@@ -62,5 +63,7 @@ uint8_t PIR_counterLimit(PIR_Occurance* PIR_status);
 
 uint8_t PIR_IRQEnabled();
 void PIR_IRQstate(uint8_t state);
+//check if it's end of movement (multiple impulses)
+uint8_t PIR_endOfMovement(PIR_Event *PIR);
 
 #endif /* INC_PIR_H_ */

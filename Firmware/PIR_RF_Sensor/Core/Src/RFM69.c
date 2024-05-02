@@ -636,7 +636,7 @@ void RFM69_ISRRx(void)
 void RFM69_initMsg(void)
 {
 	//RFM69 init correctly
-	RFM69_sendWithRetry(RF_MASTER_ID, "RFi=1",
-						sizeof(char)*5,RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
+	if(!RFM69_sendWithRetry(RF_MASTER_ID, "RFi=1",
+						sizeof(char)*5,RF_NUM_OF_RETRIES, RF_TX_TIMEOUT));
 }
 

@@ -116,18 +116,25 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  //Check if timeout on PIR
-	  if(PIR_SensivityTimeout(&PIR_instance) || PIR_counterLimit(&PIR_instance)){
-		  PIR_IRQstate(0);
-		  //Send info to ESP
-		  if(!PIR_sendRF(&PIR_instance, PIR)){
-			  RFM69_send(RF_MASTER_ID, "Sent failed", sizeof(char)*11, false);
+	  //Żeby nie było ujemnego miejsca w tabeli poniżej
+	  if(PIR_instance.PIR_numOfEvents>0){
+		  //Check if timeout on PIR
+		  if(PIR_endOfMovement(&PIR[PIR_instance.PIR_numOfEvents-1])
+			  || PIR_counterLimit(&PIR_instance)){
+			  PIR_IRQstate(0);
+			  //Calc movement duration
+			  PIR_instance.PIR_movementDuration = HAL_GetTick() - PIR[0].PIR_start;
+			  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+			  //Send info to ESP
+			  if(!PIR_sendRF(&PIR_instance, PIR)){
+				  RFM69_send(RF_MASTER_ID, "Sent failed", sizeof(char)*11, false);
+			  }
+			  PIR_reset(&PIR_instance);
+			  for(int i=0; i<20; i++){
+				  memset(&PIR[i], 0, sizeof(PIR_Event));
+			  }
+			  PIR_IRQstate(1);
 		  }
-		  PIR_reset(&PIR_instance);
-		  for(int i=0; i<20; i++){
-			  memset(&PIR[i], 0, sizeof(PIR_Event));
-		  }
-		  PIR_IRQstate(1);
 	  }
     /* USER CODE END WHILE */
 
@@ -202,10 +209,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	{
 		if(HAL_GPIO_ReadPin(GPIOA, GPIO_Pin)){
 			PIR_DetectionCallback(GPIO_Pin, PIR_RISING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance, HAL_GetTick());
-			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 		} else {
 			PIR_DetectionCallback(GPIO_Pin, PIR_FALLING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance, HAL_GetTick());
-			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 		}
 	}
 //	if(GPIO_Pin == PIR_H_Pin)

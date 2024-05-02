@@ -24,8 +24,9 @@ void PIR_init()
 {
 	//Set sensivity timer
 	PIR_SetSensivityTimer(2);
-	//wait 8s for PIR settling
-	HAL_Delay(10000);
+	//wait for PIR settling -> PIR_H and PIR_L HIGH
+	while(!HAL_GPIO_ReadPin(PIR_H_GPIO_Port, PIR_H_Pin) &&
+			!HAL_GPIO_ReadPin(PIR_L_GPIO_Port, PIR_L_Pin));
 	PIR_IRQstate(1);
 }
 
@@ -35,9 +36,13 @@ void PIR_DetectionCallback(uint16_t PIR_Pin, uint8_t PIR_PinIRQ, PIR_Event* PIR,
 	if(PIR_PinIRQ == PIR_FALLING && PIR_isFirst(PIR)){
 		PIR_startPhase(PIR, PIR_Pin, time);
 	} else if(PIR_PinIRQ == PIR_RISING && PIR_Pin == PIR->PIR_RisingPin){
-		//debounce (circa 2 ms unstable signal)
-		if(PIR_IRQduration(PIR->PIR_start, time) >= 5){
+		//debounce (circa 20 ms unstable signal)
+		if(PIR_IRQduration(PIR->PIR_start, time) >= 20){
 			PIR_endPhase(PIR, PIR_status, time);
+		} else {
+			//sytuacja gdy występują pojedyncze piki - zakłócenia
+			memset(PIR, 0, sizeof(PIR_Event));
+			HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 		}
 	}
 }
@@ -45,6 +50,8 @@ void PIR_DetectionCallback(uint16_t PIR_Pin, uint8_t PIR_PinIRQ, PIR_Event* PIR,
 uint8_t PIR_isFirst(PIR_Event* PIR)
 {
 	if(!PIR->PIR_RisingPin){
+		//Set LED high
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 		return 1;
 	}
 	return 0;
@@ -77,6 +84,28 @@ uint32_t PIR_IRQduration(uint32_t StartTime, uint32_t EndTime)
 	return EndTime - StartTime;
 }
 
+uint8_t PIR_endOfMovement(PIR_Event *PIR)
+{
+	if(PIR->PIR_duration == 0){
+		return 0;
+	}
+
+	GPIO_PinState PIR_H_State = HAL_GPIO_ReadPin(PIR_H_GPIO_Port, PIR_H_Pin);
+	GPIO_PinState PIR_L_State = HAL_GPIO_ReadPin(PIR_L_GPIO_Port, PIR_L_Pin);
+	//sprawdza czy oba piny HIGH -> wtedy nie wykrywa ruchu
+	if(PIR_H_State == GPIO_PIN_SET && PIR_L_State == GPIO_PIN_SET){
+		/*oblicza czas od ostatniego zbocza impulsu -> jeśli powyżej 300ms to
+		można uznać że ruch zakończono*/
+		uint32_t now = HAL_GetTick();
+		uint32_t lastEdge = PIR->PIR_start + PIR->PIR_duration;
+		if(now - lastEdge > 300 || PIR_SensivityTimeout()){
+			//koniec ruchu
+			return 1;
+		}
+	}
+	return 0;
+}
+
 void PIR_SetSensivityTimer(uint8_t SensivityLevel)
 {
 	enum sensivity Level = SensivityLevel;
@@ -103,13 +132,10 @@ void PIR_SetSensivityTimer(uint8_t SensivityLevel)
 	}
 }
 
-uint8_t PIR_SensivityTimeout(PIR_Occurance* PIR_status)
+uint8_t PIR_SensivityTimeout()
 {
-	//only if registered event
-	if(PIR_status->PIR_numOfEvents > 0){
-		if(HAL_GetTick() - PIR_timeoutStart >= PIR_timeout){
-			return 1;
-		}
+	if(HAL_GetTick() - PIR_timeoutStart >= PIR_timeout){
+		return 1;
 	}
 	return 0;
 }
@@ -145,14 +171,15 @@ uint8_t PIR_sendRF(PIR_Occurance* PIR_status, PIR_Event PIR[])
 
 const char* PIR_preparePacket(PIR_Occurance* PIR_status)
 {
-	char* packetFormat = "TD=%d,NE=%d,MD=%d";
+	char* packetFormat = "TD=%d,NE=%d,MD=%d,D=%d";
 
 	char packet[RF69_MAX_DATA_LEN];
 	memset(packet, '\0', sizeof(char)*RF69_MAX_DATA_LEN);
 
 	sprintf(packet, packetFormat, PIR_status->PIR_triggerDirection,
 								  PIR_status->PIR_numOfEvents,
-								  PIR_status->PIR_meanDuration);
+								  PIR_status->PIR_meanDuration,
+								  PIR_status->PIR_movementDuration);
 
 	char *stringBuf = malloc(RF69_MAX_DATA_LEN);
 	strcpy(stringBuf, packet);

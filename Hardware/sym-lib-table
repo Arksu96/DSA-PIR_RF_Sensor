@@ -1,4 +1,0 @@
-(sym_lib_table
-  (lib (name "Sensor_PIR")(type "KiCad")(uri "${KIPRJMOD}/Sensor_PIR.kicad_sym")(options "")(descr ""))
-  (lib (name "PIR_ProjectLib")(type "KiCad")(uri "/home/arksu/Dokumenty/PIR module/PIR_ProjectLib.kicad_sym")(options "")(descr ""))
-)
