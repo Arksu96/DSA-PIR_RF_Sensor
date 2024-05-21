@@ -1,1 +1,5 @@
 /Debug/
+/.cproject
+/.mxproject
+/PIR_RF_Sensor Debug.cfg
+/PIR_RF_Sensor Debug.launch
