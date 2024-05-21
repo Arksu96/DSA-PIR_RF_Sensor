@@ -43,7 +43,7 @@ static volatile uint8_t _mode = RF69_MODE_STANDBY;
 static volatile int16_t rssi;                   // most accurate RSSI during reception (closest to the reception)
 
 static uint8_t _address;
-static uint8_t _powerLevel = 20; //prawdopodobnie zbyt wysoka wartość powodowała problemy
+static uint8_t _powerLevel = 30; //prawdopodobnie zbyt wysoka wartość powodowała problemy
 bool _promiscuousMode = false;
 
 // internal
@@ -636,7 +636,7 @@ void RFM69_ISRRx(void)
 void RFM69_initMsg(void)
 {
 	//RFM69 init correctly
-	if(!RFM69_sendWithRetry(RF_MASTER_ID, "RFi=1",
-						sizeof(char)*5,RF_NUM_OF_RETRIES, RF_TX_TIMEOUT));
+	RFM69_sendWithRetry(RF_MASTER_ID, "RFi=1",sizeof(char)*5,
+			RF_NUM_OF_RETRIES, RF_TX_TIMEOUT); // @suppress("Suspicious semicolon")
 }
 

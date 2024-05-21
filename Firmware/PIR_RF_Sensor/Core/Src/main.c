@@ -129,10 +129,15 @@ int main(void)
 			  if(!PIR_sendRF(&PIR_instance, PIR)){
 				  RFM69_send(RF_MASTER_ID, "Sent failed", sizeof(char)*11, false);
 			  }
+			  uint32_t RFdebounce = HAL_GetTick();
 			  PIR_reset(&PIR_instance);
 			  for(int i=0; i<20; i++){
 				  memset(&PIR[i], 0, sizeof(PIR_Event));
 			  }
+			  //Prevent noise from RF
+			  while((!HAL_GPIO_ReadPin(PIR_H_GPIO_Port, PIR_H_Pin)
+					  && !HAL_GPIO_ReadPin(PIR_L_GPIO_Port, PIR_L_Pin))
+					  || HAL_GetTick() - RFdebounce <= 500);
 			  PIR_IRQstate(1);
 		  }
 	  }
