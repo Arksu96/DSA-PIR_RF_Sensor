@@ -132,8 +132,8 @@ bool checkInterruptStatus();		// Function check interrupt status
 void RFM69_SetCSPin(bool CS_State); // function to control the GPIO tied to RFM69 chip select (parameter HIGH or LOW)
 bool RFM69_ReadDIO0Pin(void);       // function to read GPIO connected to RFM69 DIO0 (RFM69 interrupt signalling)
 uint8_t SPI_transfer8(uint8_t);     // function to transfer 1byte on SPI with readback
-bool Timeout_IsTimeout1(void);      // function for timeout handling, checks if previously set timeout expired
-void Timeout_SetTimeout1(uint32_t); // function for timeout handling, sets a timeout, parameter is in milliseconds (ms)
+//bool Timeout_IsTimeout1(void);      // function for timeout handling, checks if previously set timeout expired
+//void Timeout_SetTimeout1(uint32_t); // function for timeout handling, sets a timeout, parameter is in milliseconds (ms)
 
 //Debug
 void RFM69_initMsg(void);

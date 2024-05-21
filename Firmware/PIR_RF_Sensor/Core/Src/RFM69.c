@@ -120,19 +120,22 @@ bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID, RFM6
   
   RFM69_reset();
   RFM69_SetCSPin(HIGH);
-  Timeout_SetTimeout1(50);
+  //Timeout_SetTimeout1(50);
+  uint32_t start = HAL_GetTick();
+  uint32_t timeout = 50;
   do
   {
     RFM69_writeReg(REG_SYNCVALUE1, 0xAA); 
   }
-  while (RFM69_readReg(REG_SYNCVALUE1) != 0xaa && !Timeout_IsTimeout1());
-  
-  Timeout_SetTimeout1(50);
+  while (RFM69_readReg(REG_SYNCVALUE1) != 0xaa && HAL_GetTick()-start < timeout);
+  start = HAL_GetTick();
   do
   {
     RFM69_writeReg(REG_SYNCVALUE1, 0x55); 
   }
-  while (RFM69_readReg(REG_SYNCVALUE1) != 0x55 && !Timeout_IsTimeout1());
+  while (RFM69_readReg(REG_SYNCVALUE1) != 0x55 && HAL_GetTick()-start < timeout);
+
+  if(HAL_GetTick()-start >= timeout) return false;
 
   for (uint8_t i = 0; CONFIG[i][0] != 255; i++)
   {
@@ -145,12 +148,10 @@ bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID, RFM6
 
   RFM69_setHighPower(ISRFM69HW); // called regardless if it's a RFM69W or RFM69HW
   RFM69_setMode(RF69_MODE_STANDBY);
-  Timeout_SetTimeout1(300);
-  while (((RFM69_readReg(REG_IRQFLAGS1) & RF_IRQFLAGS1_MODEREADY) == 0x00) && !Timeout_IsTimeout1()); // wait for ModeReady
-  if (Timeout_IsTimeout1())
-  {
-    return false;
-  }
+  timeout = 300;
+  start = HAL_GetTick();
+  while (((RFM69_readReg(REG_IRQFLAGS1) & RF_IRQFLAGS1_MODEREADY) == 0x00) && HAL_GetTick()-start < timeout); // wait for ModeReady
+  if(HAL_GetTick()-start >= timeout) return false;
 
   _stats = RFStats;
   _address = nodeID;
@@ -287,8 +288,8 @@ bool RFM69_canSend()
 void RFM69_send(uint8_t toAddress, const void* buffer, uint8_t bufferSize, bool requestACK)
 {
   RFM69_writeReg(REG_PACKETCONFIG2, (RFM69_readReg(REG_PACKETCONFIG2) & 0xFB) | RF_PACKET2_RXRESTART); // avoid RX deadlocks
-  Timeout_SetTimeout1(RF69_CSMA_LIMIT_MS);
-  while (!RFM69_canSend() && !Timeout_IsTimeout1()){
+  uint32_t now = HAL_GetTick();
+  while (!RFM69_canSend() && HAL_GetTick() - now < RF69_CSMA_LIMIT_MS){
 	  RFM69_receiveDone();
   }
   RFM69_sendFrame(toAddress, buffer, bufferSize, requestACK, false);
@@ -302,11 +303,12 @@ void RFM69_send(uint8_t toAddress, const void* buffer, uint8_t bufferSize, bool 
 // replies usually take only 5..8ms at 50kbps@915MHz
 bool RFM69_sendWithRetry(uint8_t toAddress, const void* buffer, uint8_t bufferSize, uint8_t retries, uint8_t retryWaitTime) 
 {
+  uint32_t sentTime;
   for (uint8_t i = 0; i <= retries; i++)
   {
     RFM69_send(toAddress, buffer, bufferSize, true);
-    Timeout_SetTimeout1(retryWaitTime);
-    while (!Timeout_IsTimeout1()){
+    sentTime = HAL_GetTick();
+    while (HAL_GetTick() - sentTime < retryWaitTime){
       if (RFM69_ACKReceived(toAddress)){
         return true;
       }
@@ -338,8 +340,8 @@ void RFM69_sendACK(const void* buffer, uint8_t bufferSize)
   uint8_t sender = senderID;
   int16_t l_rssi = rssi; // save payload received RSSI value
   RFM69_writeReg(REG_PACKETCONFIG2, (RFM69_readReg(REG_PACKETCONFIG2) & 0xFB) | RF_PACKET2_RXRESTART); // avoid RX deadlocks
-  Timeout_SetTimeout1(RF69_CSMA_LIMIT_MS);
-  while (!RFM69_canSend() && !Timeout_IsTimeout1())
+  uint32_t now = HAL_GetTick();
+  while (!RFM69_canSend() && HAL_GetTick() - now < RF69_CSMA_LIMIT_MS)
   {
     RFM69_receiveDone();
   }
@@ -380,10 +382,10 @@ static void RFM69_sendFrame(uint8_t toAddress, const void* buffer, uint8_t buffe
 
   // no need to wait for transmit mode to be ready since its handled by the radio
   RFM69_setMode(RF69_MODE_TX);
-  Timeout_SetTimeout1(RF69_TX_LIMIT_MS);
-  //while (RFM69_ReadDIO0Pin() == 1 && !Timeout_IsTimeout1()); // wait for DIO0 to turn HIGH signalling transmission finish
+  uint32_t txStart = HAL_GetTick();
+  while (RFM69_ReadDIO0Pin() == 0 && HAL_GetTick() - txStart < RF69_TX_LIMIT_MS); // wait for DIO0 to turn HIGH signalling transmission finish
   //uint8_t irq2Val = RFM69_readReg(REG_IRQFLAGS2);
-  while ((RFM69_readReg(REG_IRQFLAGS2) & RF_IRQFLAGS2_PACKETSENT) == 0x00); // wait for ModeReady
+  //while ((RFM69_readReg(REG_IRQFLAGS2) & RF_IRQFLAGS2_PACKETSENT) == 0x00); // wait for ModeReady
   RFM69_setMode(RF69_MODE_STANDBY);
   (_stats->msgSend)++;
 }
@@ -608,19 +610,19 @@ uint8_t SPI_transfer8(uint8_t byte)
 	return readData;
 }
 
-bool Timeout_IsTimeout1(void)
-{
-	if((HAL_GetTick() - tickStart) >= timerValue){
-		tickStart = HAL_GetTick();
-		return true;
-	}
-	return false;
-}
-void Timeout_SetTimeout1(uint32_t Value)
-{
-	timerValue = Value;
-	tickStart = HAL_GetTick();
-}
+//bool Timeout_IsTimeout1(void)
+//{
+//	if((HAL_GetTick() - tickStart) >= timerValue){
+//		tickStart = HAL_GetTick();
+//		return true;
+//	}
+//	return false;
+//}
+//void Timeout_SetTimeout1(uint32_t Value)
+//{
+//	timerValue = Value;
+//	tickStart = HAL_GetTick();
+//}
 
 void RFM69_ISRRx(void)
 {
