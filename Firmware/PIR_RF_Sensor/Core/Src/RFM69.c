@@ -30,7 +30,9 @@
 // **********************************************************************************
 #include "RFM69.h"
 #include "RFM69registers.h"
+#include "RFM69_Parser.h"
 #include "main.h"
+#include <string.h>
 
 static volatile uint8_t data[RF69_MAX_DATA_LEN]; // recv/xmit buf, including header & crc bytes
 static volatile uint8_t datalen;
@@ -61,6 +63,8 @@ SPI_HandleTypeDef *RFM_hspi;
 
 //Stats
 struct RFM69Stats_t *_stats;
+rxMessage_t rxBuffer;
+
 
 void SPIInit(SPI_HandleTypeDef *spi)
 {
@@ -330,7 +334,7 @@ bool RFM69_ACKReceived(uint8_t fromNodeID)
 // check whether an ACK was requested in the last received packet (non-broadcasted packet)
 bool RFM69_ACKRequested() 
 {
-  return ACK_Requested && (targetID != RF69_BROADCAST_ADDR);
+  return ACK_Requested && (targetID != _address);
 }
 
 // should be called immediately after reception in case sender wants ACK
@@ -383,7 +387,7 @@ static void RFM69_sendFrame(uint8_t toAddress, const void* buffer, uint8_t buffe
   // no need to wait for transmit mode to be ready since its handled by the radio
   RFM69_setMode(RF69_MODE_TX);
   uint32_t txStart = HAL_GetTick();
-  while (RFM69_ReadDIO0Pin() == 0 && HAL_GetTick() - txStart < RF69_TX_LIMIT_MS); // wait for DIO0 to turn HIGH signalling transmission finish
+  while (RFM69_ReadDIO0Pin() == GPIO_PIN_RESET && HAL_GetTick() - txStart < RF69_TX_LIMIT_MS); // wait for DIO0 to turn HIGH signalling transmission finish
   //uint8_t irq2Val = RFM69_readReg(REG_IRQFLAGS2);
   //while ((RFM69_readReg(REG_IRQFLAGS2) & RF_IRQFLAGS2_PACKETSENT) == 0x00); // wait for ModeReady
   RFM69_setMode(RF69_MODE_STANDBY);
@@ -415,6 +419,7 @@ void RFM69_interruptHandler() {
     datalen = payloadLen - 3;
     senderID = SPI_transfer8(0);
     CTLbyte = SPI_transfer8(0);
+    rxBuffer.senderID = senderID;
 
     ACK_RECEIVED = CTLbyte & RFM69_CTL_SENDACK; // extract ACK-received flag
     ACK_Requested = CTLbyte & RFM69_CTL_REQACK; // extract ACK-requested flag
@@ -423,16 +428,16 @@ void RFM69_interruptHandler() {
 
     for (uint8_t i = 0; i < datalen; i++)
     {
-      data[i] = SPI_transfer8(0);
+    	rxBuffer.data[i] = SPI_transfer8(0);
     }
-    if (datalen < RF69_MAX_DATA_LEN) data[datalen] = 0; // add null at end of string
+    if (datalen < RF69_MAX_DATA_LEN) data[datalen] = '\0'; // add null at end of string
     RFM69_unselect();
     RFM69_setMode(RF69_MODE_RX);
     (_stats->msgReceived)++;
   }
   rssi = RFM69_readRSSI(false);
+  rxBuffer.rssi = rssi;
   (_stats->lastRSSI) = rssi;
-  //Parser
 }
 
 // internal function
@@ -626,12 +631,16 @@ uint8_t SPI_transfer8(uint8_t byte)
 
 void RFM69_ISRRx(void)
 {
-	noInterrupts();
+	//noInterrupts();
 	RFM69_interruptHandler();
 	if(RFM69_ACKRequested()){
 		RFM69_sendACK("", 0);
 	}
-	interrupts();
+	RFM69_receiveDone();
+	//Parser
+	RFM69Parser_dataDecoder((char *)rxBuffer.data, datalen);
+	memset(&rxBuffer, 0, sizeof(rxMessage_t));
+	//interrupts();
 	//Can add some error handling
 }
 
