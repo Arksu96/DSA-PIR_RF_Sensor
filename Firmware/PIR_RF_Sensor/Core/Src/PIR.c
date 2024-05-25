@@ -164,8 +164,8 @@ uint8_t PIR_sendRF(PIR_Occurance* PIR_status, PIR_Event PIR[])
 	RF_OK = RFM69_sendWithRetry(RF_MASTER_ID, packet,
 								sizeof(char)*strlen(packet),
 								RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
+	RFM69_setMode(RF69_MODE_RX);
 	free((char*)packet);
-
 	return RF_OK;
 }
 

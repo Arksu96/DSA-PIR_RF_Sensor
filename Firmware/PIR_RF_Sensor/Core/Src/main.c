@@ -128,6 +128,7 @@ int main(void)
 			  //Send info to ESP
 			  if(!PIR_sendRF(&PIR_instance, PIR)){
 				  RFM69_send(RF_MASTER_ID, "Sent failed", sizeof(char)*11, false);
+				  RFM69_setMode(RF69_MODE_RX);
 			  }
 			  uint32_t RFdebounce = HAL_GetTick();
 			  PIR_reset(&PIR_instance);
@@ -206,7 +207,7 @@ static void MX_NVIC_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	if(GPIO_Pin == RF_Payload_Pin && checkInterruptStatus())
+	if(GPIO_Pin == RF_Payload_Pin)
 	{
 		RFM69_ISRRx();
 	}
