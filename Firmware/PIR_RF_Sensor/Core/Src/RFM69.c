@@ -43,7 +43,7 @@ static volatile uint8_t _mode = RF69_MODE_STANDBY;
 static volatile int16_t rssi;                   // most accurate RSSI during reception (closest to the reception)
 
 static uint8_t _address;
-static uint8_t _powerLevel = 30; //prawdopodobnie zbyt wysoka wartość powodowała problemy
+static uint8_t _powerLevel = 20; //prawdopodobnie zbyt wysoka wartość powodowała problemy
 bool _promiscuousMode = false;
 
 // internal
@@ -61,6 +61,13 @@ SPI_HandleTypeDef *RFM_hspi;
 
 //Stats
 struct RFM69Stats_t *_stats;
+
+//Debug
+//uint8_t irqflag2_ISR;
+//uint8_t opMode_ISR;
+//uint8_t irqflag2_sendFrame;
+//uint8_t irqflag1_sendFrame;
+//uint8_t opMode_sendFrame;
 
 void SPIInit(SPI_HandleTypeDef *spi)
 {
@@ -80,11 +87,15 @@ bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID, RFM6
   {
     /* 0x01 */ { REG_OPMODE, RF_OPMODE_SEQUENCER_ON | RF_OPMODE_LISTEN_OFF | RF_OPMODE_STANDBY },
     /* 0x02 */ { REG_DATAMODUL, RF_DATAMODUL_DATAMODE_PACKET | RF_DATAMODUL_MODULATIONTYPE_FSK | RF_DATAMODUL_MODULATIONSHAPING_00 }, // no shaping
-    /* 0x03 */ { REG_BITRATEMSB, RF_BITRATEMSB_55555}, // default: 4.8 KBPS
-    /* 0x04 */ { REG_BITRATELSB, RF_BITRATELSB_55555},
-    /* 0x05 */ { REG_FDEVMSB, RF_FDEVMSB_50000}, // default: 5KHz, (FDEV + BitRate / 2 <= 500KHz)
-    /* 0x06 */ { REG_FDEVLSB, RF_FDEVLSB_50000},
-
+//    /* 0x03 */ { REG_BITRATEMSB, RF_BITRATEMSB_55555}, // default: 4.8 KBPS
+//    /* 0x04 */ { REG_BITRATELSB, RF_BITRATELSB_55555},
+//    /* 0x05 */ { REG_FDEVMSB, RF_FDEVMSB_50000}, // default: 5KHz, (FDEV + BitRate / 2 <= 500KHz)
+//    /* 0x06 */ { REG_FDEVLSB, RF_FDEVLSB_50000},
+	//Optimized config
+	/* 0x03 */ { REG_BITRATEMSB, RF_BITRATEMSB_4800}, // default: 4.8 KBPS
+	/* 0x04 */ { REG_BITRATELSB, RF_BITRATELSB_4800},
+	/* 0x05 */ { REG_FDEVMSB, RF_FDEVMSB_5000}, // default: 5KHz, (FDEV + BitRate / 2 <= 500KHz)
+	/* 0x06 */ { REG_FDEVLSB, 0x50},
     /* 0x07 */ { REG_FRFMSB, (uint8_t) (freqBand==RF69_315MHZ ? RF_FRFMSB_315 : (freqBand==RF69_433MHZ ? RF_FRFMSB_433 : (freqBand==RF69_868MHZ ? RF_FRFMSB_868 : RF_FRFMSB_915))) },
     /* 0x08 */ { REG_FRFMID, (uint8_t) (freqBand==RF69_315MHZ ? RF_FRFMID_315 : (freqBand==RF69_433MHZ ? RF_FRFMID_433 : (freqBand==RF69_868MHZ ? RF_FRFMID_868 : RF_FRFMID_915))) },
     /* 0x09 */ { REG_FRFLSB, (uint8_t) (freqBand==RF69_315MHZ ? RF_FRFLSB_315 : (freqBand==RF69_433MHZ ? RF_FRFLSB_433 : (freqBand==RF69_868MHZ ? RF_FRFLSB_868 : RF_FRFLSB_915))) },
@@ -98,7 +109,9 @@ bool RFM69_initialize(uint8_t freqBand, uint8_t nodeID, uint16_t networkID, RFM6
     ///* 0x13 */ { REG_OCP, RF_OCP_ON | RF_OCP_TRIM_95 }, // over current protection (default is 95mA)
 
     // RXBW defaults are { REG_RXBW, RF_RXBW_DCCFREQ_010 | RF_RXBW_MANT_24 | RF_RXBW_EXP_5} (RxBw: 10.4KHz)
-    /* 0x19 */ { REG_RXBW, RF_RXBW_DCCFREQ_010 | RF_RXBW_MANT_16 | RF_RXBW_EXP_2 }, // (BitRate < 2 * RxBw)
+//    /* 0x19 */ { REG_RXBW, RF_RXBW_DCCFREQ_010 | RF_RXBW_MANT_16 | RF_RXBW_EXP_2 }, // (BitRate < 2 * RxBw)
+	//Optimized config
+	/* 0x19 */ { REG_RXBW, RF_RXBW_DCCFREQ_010 | RF_RXBW_MANT_16 | RF_RXBW_EXP_4 }, // (BitRate < 2 * RxBw)
     //for BR-19200: /* 0x19 */ { REG_RXBW, RF_RXBW_DCCFREQ_010 | RF_RXBW_MANT_24 | RF_RXBW_EXP_3 },
     /* 0x25 */ { REG_DIOMAPPING1, RF_DIOMAPPING1_DIO0_01 }, // DIO0 is the only IRQ we're using
     /* 0x26 */ { REG_DIOMAPPING2, RF_DIOMAPPING2_CLKOUT_OFF }, // DIO5 ClkOut disable for power saving
@@ -352,9 +365,11 @@ void RFM69_sendACK(const void* buffer, uint8_t bufferSize)
 static void RFM69_sendFrame(uint8_t toAddress, const void* buffer, uint8_t bufferSize, bool requestACK, bool sendACK)
 {
   RFM69_setMode(RF69_MODE_STANDBY); // turn off receiver to prevent reception while filling fifo
-  //uint8_t modeVal = RFM69_readReg(REG_OPMODE);
   //uint8_t irqVal = RFM69_readReg(REG_IRQFLAGS1);// wait for ModeReady
-  while ((RFM69_readReg(REG_IRQFLAGS1) & RF_IRQFLAGS1_MODEREADY) == 0x00);
+  //irqflag1_sendFrame = RFM69_readReg(REG_IRQFLAGS1);
+  //Unblock IRQ if wrong state
+  Timeout_SetTimeout1(100);
+  while (((RFM69_readReg(REG_IRQFLAGS1) & RF_IRQFLAGS1_MODEREADY) == 0x00) && !Timeout_IsTimeout1());
   //RFM69_writeReg(REG_DIOMAPPING1, RF_DIOMAPPING1_DIO0_00); // DIO0 is "Packet Sent"
   if (bufferSize > RF69_MAX_DATA_LEN) bufferSize = RF69_MAX_DATA_LEN;
 
@@ -380,10 +395,15 @@ static void RFM69_sendFrame(uint8_t toAddress, const void* buffer, uint8_t buffe
 
   // no need to wait for transmit mode to be ready since its handled by the radio
   RFM69_setMode(RF69_MODE_TX);
-  Timeout_SetTimeout1(RF69_TX_LIMIT_MS);
+  //opMode_sendFrame = RFM69_readReg(REG_OPMODE);
+  //while((RFM69_readReg(REG_OPMODE) & RF_OPMODE_TRANSMITTER) == 0x00);
   //while (RFM69_ReadDIO0Pin() == 1 && !Timeout_IsTimeout1()); // wait for DIO0 to turn HIGH signalling transmission finish
   //uint8_t irq2Val = RFM69_readReg(REG_IRQFLAGS2);
-  while ((RFM69_readReg(REG_IRQFLAGS2) & RF_IRQFLAGS2_PACKETSENT) == 0x00); // wait for ModeReady
+  noInterrupts();
+  Timeout_SetTimeout1(100);
+  while (((RFM69_readReg(REG_IRQFLAGS2) & RF_IRQFLAGS2_PACKETSENT) == 0x00) && !Timeout_IsTimeout1());
+  //irqflag2_sendFrame = RFM69_readReg(REG_IRQFLAGS2);
+  interrupts();
   RFM69_setMode(RF69_MODE_STANDBY);
   (_stats->msgSend)++;
 }
@@ -611,7 +631,7 @@ uint8_t SPI_transfer8(uint8_t byte)
 bool Timeout_IsTimeout1(void)
 {
 	if((HAL_GetTick() - tickStart) >= timerValue){
-		tickStart = HAL_GetTick();
+		//tickStart = HAL_GetTick();
 		return true;
 	}
 	return false;
@@ -625,6 +645,9 @@ void Timeout_SetTimeout1(uint32_t Value)
 void RFM69_ISRRx(void)
 {
 	//noInterrupts();
+	//DEBUG
+//	irqflag2_ISR = RFM69_readReg(REG_IRQFLAGS2);
+//	opMode_ISR = RFM69_readReg(REG_OPMODE);
 	RFM69_interruptHandler();
 	if(RFM69_ACKRequested()){
 		RFM69_sendACK("", 0);
@@ -637,7 +660,8 @@ void RFM69_ISRRx(void)
 void RFM69_initMsg(void)
 {
 	//RFM69 init correctly
-	RFM69_sendWithRetry(RF_MASTER_ID, "RFi=1",sizeof(char)*5,
-			RF_NUM_OF_RETRIES, RF_TX_TIMEOUT); // @suppress("Suspicious semicolon")
+	//noInterrupts();
+	RFM69_sendWithRetry(RF_MASTER_ID, "RFi=1",sizeof(char)*5, RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
 	RFM69_setMode(RF69_MODE_RX);
+	//interrupts();
 }

@@ -105,8 +105,8 @@ int main(void)
   /* USER CODE BEGIN 2 */
   SPIInit(&hspi1);
   if(RFM69_initialize(RF69_868MHZ, 2, 1, &RFStats)){
-	  RFMinit = 1;
-	  RFM69_initMsg();
+	 RFMinit = 1;
+	 RFM69_initMsg();
   }
   deviceType = RFM69_readReg(0x10);
   PIR_init();
@@ -124,7 +124,7 @@ int main(void)
 			  PIR_IRQstate(0);
 			  //Calc movement duration
 			  PIR_instance.PIR_movementDuration = HAL_GetTick() - PIR[0].PIR_start;
-			  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+			  //HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 			  //Send info to ESP
 			  if(!PIR_sendRF(&PIR_instance, PIR)){
 				  RFM69_send(RF_MASTER_ID, "Sent failed", sizeof(char)*11, false);
@@ -142,6 +142,7 @@ int main(void)
 			  PIR_IRQstate(1);
 		  }
 	  }
+	  LED_MotionBlink();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -207,7 +208,7 @@ static void MX_NVIC_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	if(GPIO_Pin == RF_Payload_Pin)
+	if(GPIO_Pin == RF_Payload_Pin && checkInterruptStatus())
 	{
 		RFM69_ISRRx();
 	}
@@ -219,22 +220,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 			PIR_DetectionCallback(GPIO_Pin, PIR_FALLING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance, HAL_GetTick());
 		}
 	}
-//	if(GPIO_Pin == PIR_H_Pin)
-//	{
-//		if(HAL_GPIO_ReadPin(PIR_H_GPIO_Port, PIR_H_Pin) == GPIO_PIN_SET){
-//			PIR_DetectionCallback(PIR_H_Pin, PIR_RISING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
-//		} else {
-//			PIR_DetectionCallback(PIR_H_Pin, PIR_FALLING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
-//		}
-//	}
-//	if(GPIO_Pin == PIR_L_Pin)
-//	{
-//		if(HAL_GPIO_ReadPin(PIR_L_GPIO_Port, PIR_L_Pin) == GPIO_PIN_SET){
-//			PIR_DetectionCallback(PIR_L_Pin, PIR_RISING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
-//		} else {
-//			PIR_DetectionCallback(PIR_L_Pin, PIR_FALLING, &PIR[PIR_instance.PIR_numOfEvents], &PIR_instance);
-//		}
-//	}
 }
 /* USER CODE END 4 */
 

@@ -20,13 +20,28 @@ uint16_t PIR_counterMax;
 
 uint8_t IRQEnabled = 0;
 
+//LED Blink
+bool led_motionFlag = false;
+uint32_t led_motionTimer = 0;
+
 void PIR_init()
 {
 	//Set sensivity timer
 	PIR_SetSensivityTimer(2);
-	//wait for PIR settling -> PIR_H and PIR_L HIGH
+	uint32_t blink_timer = 0;
+	uint32_t init_timer = HAL_GetTick();
+	//wait for PIR settling -> PIR_H and PIR_L HIGH and init timer not pass
 	while(!HAL_GPIO_ReadPin(PIR_H_GPIO_Port, PIR_H_Pin) &&
-			!HAL_GPIO_ReadPin(PIR_L_GPIO_Port, PIR_L_Pin));
+			!HAL_GPIO_ReadPin(PIR_L_GPIO_Port, PIR_L_Pin) &&
+			HAL_GetTick() - init_timer <= 10000)
+	{
+		//show LED blink during wait
+		if((HAL_GetTick() - blink_timer) >= 500){
+			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+			blink_timer = HAL_GetTick();
+		}
+	}
+	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 	PIR_IRQstate(1);
 }
 
@@ -50,8 +65,6 @@ void PIR_DetectionCallback(uint16_t PIR_Pin, uint8_t PIR_PinIRQ, PIR_Event* PIR,
 uint8_t PIR_isFirst(PIR_Event* PIR)
 {
 	if(!PIR->PIR_RisingPin){
-		//Set LED high
-		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 		return 1;
 	}
 	return 0;
@@ -100,6 +113,7 @@ uint8_t PIR_endOfMovement(PIR_Event *PIR)
 		uint32_t lastEdge = PIR->PIR_start + PIR->PIR_duration;
 		if(now - lastEdge > 300 || PIR_SensivityTimeout()){
 			//koniec ruchu
+			led_motionFlag = true;
 			return 1;
 		}
 	}
@@ -161,10 +175,12 @@ uint8_t PIR_sendRF(PIR_Occurance* PIR_status, PIR_Event PIR[])
 	//prepare packet
 	const char *packet = PIR_preparePacket(PIR_status);
 	//send packet
+	//noInterrupts();
 	RF_OK = RFM69_sendWithRetry(RF_MASTER_ID, packet,
 								sizeof(char)*strlen(packet),
 								RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
 	RFM69_setMode(RF69_MODE_RX);
+	//interrupts();
 	free((char*)packet);
 	return RF_OK;
 }
@@ -206,4 +222,17 @@ uint8_t PIR_IRQEnabled()
 void PIR_IRQstate(uint8_t state)
 {
 	IRQEnabled = state;
+}
+
+void LED_MotionBlink()
+{
+	if(led_motionFlag){
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+		led_motionTimer = HAL_GetTick();
+		led_motionFlag = false;
+	}
+	if((HAL_GetTick() - led_motionTimer) >= 500){
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+		led_motionTimer = 0;
+	}
 }

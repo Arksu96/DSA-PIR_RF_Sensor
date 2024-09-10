@@ -65,5 +65,7 @@ uint8_t PIR_IRQEnabled();
 void PIR_IRQstate(uint8_t state);
 //check if it's end of movement (multiple impulses)
 uint8_t PIR_endOfMovement(PIR_Event *PIR);
+//Control LED
+void LED_MotionBlink();
 
 #endif /* INC_PIR_H_ */

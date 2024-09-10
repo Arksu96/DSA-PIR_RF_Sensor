@@ -51,4 +51,5 @@ void RFM69Parser_ping()
 {
 	RFM69_sendWithRetry(RF_MASTER_ID, "PONG", sizeof(char)*4,
 				RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
+	RFM69_setMode(RF69_MODE_RX);
 }
