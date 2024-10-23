@@ -29,11 +29,11 @@ void RFM69Parser_dataDecoder(char *msg, int msg_length)
 {
 	//Kopiuje wiadomość do zmiennej lokalnej
 	char* _msg = (char*)malloc(msg_length+1);
-	memcpy(_msg, msg, msg_length);
+	strcpy(_msg, msg);
 	_msg[msg_length] = '\0';
 
 	//Sprawdzenie jakiego typu dane
-	RFM69_msg_rx_t dataType = check_msg_type((char *)_msg);
+	RFM69_msg_rx_t dataType = check_msg_type(_msg);
 
 	switch (dataType)
 	{
@@ -43,13 +43,12 @@ void RFM69Parser_dataDecoder(char *msg, int msg_length)
 	default:
 		break;
 	}
-
 	free(_msg);
 }
 
 void RFM69Parser_ping()
 {
-	RFM69_sendWithRetry(RF_MASTER_ID, "PONG", sizeof(char)*4,
+	RFM69_sendWithRetry(RF_MASTER_ID, "PONG", 4,
 				RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
 	RFM69_setMode(RF69_MODE_RX);
 }

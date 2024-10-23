@@ -173,34 +173,32 @@ uint8_t PIR_sendRF(PIR_Occurance* PIR_status, PIR_Event PIR[])
 	//calculate mean duration
 	PIR_status->PIR_meanDuration = PIR_MeanDuration(PIR, PIR_status->PIR_numOfEvents);
 	//prepare packet
-	const char *packet = PIR_preparePacket(PIR_status);
+	char *packet = NULL;
+	int packet_length = 0;
+	PIR_preparePacket(PIR_status, &packet, &packet_length);
 	//send packet
-	//noInterrupts();
 	RF_OK = RFM69_sendWithRetry(RF_MASTER_ID, packet,
-								sizeof(char)*strlen(packet),
+								sizeof(char)*packet_length,
 								RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
 	RFM69_setMode(RF69_MODE_RX);
-	//interrupts();
-	free((char*)packet);
+	free(packet);
 	return RF_OK;
 }
 
-const char* PIR_preparePacket(PIR_Occurance* PIR_status)
+void PIR_preparePacket(PIR_Occurance* PIR_status, char **msg, int *len)
 {
 	char* packetFormat = "TD=%d,NE=%d,MD=%d,D=%d";
 
 	char packet[RF69_MAX_DATA_LEN];
-	memset(packet, '\0', sizeof(char)*RF69_MAX_DATA_LEN);
-
-	sprintf(packet, packetFormat, PIR_status->PIR_triggerDirection,
+	*len = sprintf(packet, packetFormat, PIR_status->PIR_triggerDirection,
 								  PIR_status->PIR_numOfEvents,
 								  PIR_status->PIR_meanDuration,
 								  PIR_status->PIR_movementDuration);
 
-	char *stringBuf = malloc(RF69_MAX_DATA_LEN);
-	strcpy(stringBuf, packet);
-
-	return stringBuf;
+	if(*len > 0){
+		*msg = (char*)malloc(sizeof(char)*(*len + 1));
+		strcpy(*msg, packet);
+	}
 }
 
 uint32_t PIR_MeanDuration(PIR_Event PIR[], uint16_t counter)

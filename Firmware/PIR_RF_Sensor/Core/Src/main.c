@@ -126,10 +126,12 @@ int main(void)
 			  PIR_instance.PIR_movementDuration = HAL_GetTick() - PIR[0].PIR_start;
 			  //HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 			  //Send info to ESP
+			  HAL_NVIC_DisableIRQ(EXTI4_15_IRQn);
 			  if(!PIR_sendRF(&PIR_instance, PIR)){
 				  RFM69_send(RF_MASTER_ID, "Sent failed", sizeof(char)*11, false);
 				  RFM69_setMode(RF69_MODE_RX);
 			  }
+			  HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 			  uint32_t RFdebounce = HAL_GetTick();
 			  PIR_reset(&PIR_instance);
 			  for(int i=0; i<20; i++){
@@ -208,9 +210,12 @@ static void MX_NVIC_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	if(GPIO_Pin == RF_Payload_Pin && checkInterruptStatus())
+	//if(GPIO_Pin == RF_Payload_Pin && checkInterruptStatus())
+	if(GPIO_Pin == RF_Payload_Pin)
 	{
+		HAL_NVIC_DisableIRQ(EXTI4_15_IRQn);
 		RFM69_ISRRx();
+		HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 	}
 	if((GPIO_Pin == PIR_H_Pin || GPIO_Pin == PIR_L_Pin) && PIR_IRQEnabled())
 	{

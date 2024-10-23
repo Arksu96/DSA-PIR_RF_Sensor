@@ -55,7 +55,7 @@ uint32_t PIR_MeanDuration(PIR_Event PIR[], uint16_t counter);
 //Send RFM69 data
 uint8_t PIR_sendRF(PIR_Occurance* PIR_status, PIR_Event PIR[]);
 //Prepare RF packet
-const char* PIR_preparePacket(PIR_Occurance* PIR_status);
+void PIR_preparePacket(PIR_Occurance* PIR_status, char **msg, int *len);
 //Reset PIR Occurance struct
 void PIR_reset();
 //Check if counter exceeded max

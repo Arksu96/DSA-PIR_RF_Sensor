@@ -399,11 +399,11 @@ static void RFM69_sendFrame(uint8_t toAddress, const void* buffer, uint8_t buffe
   //while((RFM69_readReg(REG_OPMODE) & RF_OPMODE_TRANSMITTER) == 0x00);
   //while (RFM69_ReadDIO0Pin() == 1 && !Timeout_IsTimeout1()); // wait for DIO0 to turn HIGH signalling transmission finish
   //uint8_t irq2Val = RFM69_readReg(REG_IRQFLAGS2);
-  noInterrupts();
+  //noInterrupts();
   Timeout_SetTimeout1(100);
   while (((RFM69_readReg(REG_IRQFLAGS2) & RF_IRQFLAGS2_PACKETSENT) == 0x00) && !Timeout_IsTimeout1());
   //irqflag2_sendFrame = RFM69_readReg(REG_IRQFLAGS2);
-  interrupts();
+  //interrupts();
   RFM69_setMode(RF69_MODE_STANDBY);
   (_stats->msgSend)++;
 }
@@ -413,7 +413,7 @@ void RFM69_interruptHandler() {
   
   if (_mode == RF69_MODE_RX && (RFM69_readReg(REG_IRQFLAGS2) & RF_IRQFLAGS2_PAYLOADREADY))
   {
-    uint8_t CTLbyte;
+
     //rssi = RFM69_readRSSI();
     RFM69_setMode(RF69_MODE_STANDBY);
     RFM69_select();
@@ -421,6 +421,13 @@ void RFM69_interruptHandler() {
     payloadLen = SPI_transfer8(0);
     payloadLen = payloadLen > 66 ? 66 : payloadLen; // precaution
     targetID = SPI_transfer8(0);
+    senderID = SPI_transfer8(0);
+    uint8_t CTLbyte = SPI_transfer8(0);
+
+    targetID |= ((uint16_t)CTLbyte & 0x0C) << 6; //10 bit address (most significant 2 bits stored in bits(2,3) of CTL byte
+    senderID |= ((uint16_t)CTLbyte & 0x03) << 8; //10 bit address (most sifnigicant 2 bits stored in bits(0,1) of CTL byte
+
+
     if(!(_promiscuousMode || targetID == _address || targetID == RF69_BROADCAST_ADDR) // match this node's address, or broadcast address or anything in promiscuous mode
        || payloadLen < 3) // address situation could receive packets that are malformed and don't fit this libraries extra fields
     {
@@ -431,9 +438,6 @@ void RFM69_interruptHandler() {
     }
 
     datalen = payloadLen - 3;
-    senderID = SPI_transfer8(0);
-    CTLbyte = SPI_transfer8(0);
-
     ACK_RECEIVED = CTLbyte & RFM69_CTL_SENDACK; // extract ACK-received flag
     ACK_Requested = CTLbyte & RFM69_CTL_REQACK; // extract ACK-requested flag
     
@@ -644,24 +648,17 @@ void Timeout_SetTimeout1(uint32_t Value)
 
 void RFM69_ISRRx(void)
 {
-	//noInterrupts();
-	//DEBUG
-//	irqflag2_ISR = RFM69_readReg(REG_IRQFLAGS2);
-//	opMode_ISR = RFM69_readReg(REG_OPMODE);
 	RFM69_interruptHandler();
 	if(RFM69_ACKRequested()){
 		RFM69_sendACK("", 0);
 	}
 	RFM69_setMode(RF69_MODE_RX);
-	//interrupts();
-	//Can add some error handling
 }
 
 void RFM69_initMsg(void)
 {
-	//RFM69 init correctly
-	//noInterrupts();
-	RFM69_sendWithRetry(RF_MASTER_ID, "RFi=1",sizeof(char)*5, RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
+	HAL_NVIC_DisableIRQ(EXTI4_15_IRQn);
+	RFM69_sendWithRetry(RF_MASTER_ID, "RFi=1",5, RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
 	RFM69_setMode(RF69_MODE_RX);
-	//interrupts();
+	HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 }
