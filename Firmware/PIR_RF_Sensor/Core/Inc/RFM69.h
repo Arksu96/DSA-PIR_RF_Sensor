@@ -139,5 +139,6 @@ void Timeout_SetTimeout1(uint32_t); // function for timeout handling, sets a tim
 //Debug
 void RFM69_initMsg(void);
 void RFM69_ping(void);
+bool RFM69_sendMsg(char *data, bool retry);
 
 #endif

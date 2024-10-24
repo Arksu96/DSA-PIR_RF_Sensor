@@ -31,6 +31,7 @@
 #include "RFM69.h"
 #include "RFM69registers.h"
 #include "main.h"
+#include "string.h"
 
 static volatile uint8_t data[RF69_MAX_DATA_LEN]; // recv/xmit buf, including header & crc bytes
 static volatile uint8_t datalen;
@@ -481,6 +482,7 @@ bool RFM69_receiveDone()
 {
 //ATOMIC_BLOCK(ATOMIC_FORCEON)
   //noInterrupts(); // re-enabled in RFM69_unselect() via setMode() or via RFM69_receiveBegin()
+  RFM69_interruptHandler();
   if (_mode == RF69_MODE_RX && payloadLen > 0)
   {
     RFM69_setMode(RF69_MODE_STANDBY); // enables interrupts
@@ -648,17 +650,28 @@ void Timeout_SetTimeout1(uint32_t Value)
 
 void RFM69_ISRRx(void)
 {
-	RFM69_interruptHandler();
-	if(RFM69_ACKRequested()){
-		RFM69_sendACK("", 0);
+	HAL_NVIC_DisableIRQ(EXTI4_15_IRQn);
+	if(RFM69_receiveDone()){
+		if(RFM69_ACKRequested()){
+			RFM69_sendACK("", 0);
+		}
 	}
-	RFM69_setMode(RF69_MODE_RX);
+	RFM69_receiveDone();
+	HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 }
 
-void RFM69_initMsg(void)
+bool RFM69_sendMsg(char *data, bool retry)
 {
+	bool reply = false;
 	HAL_NVIC_DisableIRQ(EXTI4_15_IRQn);
-	RFM69_sendWithRetry(RF_MASTER_ID, "RFi=1",5, RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
-	RFM69_setMode(RF69_MODE_RX);
+	if(retry){
+		reply = RFM69_sendWithRetry(RF_MASTER_ID, data, strlen(data), RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
+	} else {
+		RFM69_send(RF_MASTER_ID, data, strlen(data), true);
+	}
+	if(_mode != RF69_MODE_RX){
+		RFM69_setMode(RF69_MODE_RX);
+	}
 	HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
+	return reply;
 }

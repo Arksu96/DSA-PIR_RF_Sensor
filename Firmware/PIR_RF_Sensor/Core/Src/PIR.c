@@ -177,10 +177,11 @@ uint8_t PIR_sendRF(PIR_Occurance* PIR_status, PIR_Event PIR[])
 	int packet_length = 0;
 	PIR_preparePacket(PIR_status, &packet, &packet_length);
 	//send packet
-	RF_OK = RFM69_sendWithRetry(RF_MASTER_ID, packet,
-								sizeof(char)*packet_length,
-								RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
-	RFM69_setMode(RF69_MODE_RX);
+	RF_OK = RFM69_sendMsg(packet, true);
+//	RF_OK = RFM69_sendWithRetry(RF_MASTER_ID, packet,
+//								sizeof(char)*packet_length,
+//								RF_NUM_OF_RETRIES, RF_TX_TIMEOUT);
+//	RFM69_setMode(RF69_MODE_RX);
 	free(packet);
 	return RF_OK;
 }
